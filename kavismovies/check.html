@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Kavismovies · Movie check</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #eee; margin: 0; padding: 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .note { color: #aaa; font-size: 14px; margin-bottom: 18px; }
+  .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pill { background: #222; border: 1px solid #333; border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 14px; }
+  .pill.bad { border-color: #c2453d; color: #ff8a80; }
+  .pill.good { border-color: #2f9e6b; color: #7ee2b0; }
+  button { font: inherit; font-weight: 700; background: #3a86ff; color: #000; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; margin-right: 8px; }
+  button.ghost { background: #333; color: #eee; }
+  textarea { width: 100%; height: 140px; margin: 12px 0 20px; background: #1b1b1b; color: #eee; border: 1px solid #333; border-radius: 8px; padding: 10px; font: 13px ui-monospace, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #262626; vertical-align: top; }
+  th { color: #aaa; font-weight: 600; position: sticky; top: 0; background: #111; }
+  tr.problem td { background: rgba(194,69,61,.12); }
+  .ok { color: #7ee2b0; } .no { color: #ff8a80; font-weight: 700; } .warn { color: #ffd166; }
+  img { width: 40px; border-radius: 4px; display: block; }
+</style>
+</head>
+<body>
+  <h1>Movie check</h1>
+  <p class="note">Looks up every movie on the site and flags any that are missing a poster or description, can't be found, or might have matched the wrong movie. Each run uses one OMDb lookup per movie, so run it once and copy the results.</p>
+  <div class="summary" id="summary"><span class="pill">Starting…</span></div>
+  <div>
+    <button onclick="copyProblems()">Copy the problem list</button>
+    <button class="ghost" id="toggle" onclick="toggleAll()">Show only problems</button>
+  </div>
+  <textarea id="out" readonly placeholder="The problem list will appear here when the check finishes."></textarea>
+  <table>
+    <thead><tr><th>#</th><th>Poster</th><th>On the site</th><th>Matched on IMDb</th><th>Description</th><th>Rating</th><th>Status</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script src="tree.js"></script>
+<script>
+  const titles = [];
+  (function walk(n) { if (n.ms) n.ms.forEach(m => { if (!titles.includes(m)) titles.push(m); }); else { walk(n.y); walk(n.n); } })(window.MOVIE_TREE);
+  titles.sort((a, b) => a.localeCompare(b));
+
+  const split = m => { const x = m.match(/^(.*) \((\d{4})\)$/); return x ? { title: x[1], year: x[2] } : { title: m, year: "" }; };
+  const norm = s => (s || "").toLowerCase().replace(/&/g, "and").replace(/^the\s+/, "").replace(/[^a-z0-9]/g, "");
+  const rows = document.getElementById("rows");
+  const results = [];
+  let onlyProblems = false;
+
+  titles.forEach((m, i) => {
+    const tr = document.createElement("tr");
+    tr.id = "r" + i;
+    tr.innerHTML = `<td>${i + 1}</td><td></td><td></td><td class="warn">checking…</td><td></td><td></td><td></td>`;
+    tr.children[2].textContent = m;
+    rows.appendChild(tr);
+  });
+
+  async function check(i) {
+    const m = titles[i], { title, year } = split(m);
+    let info = null;
+    try {
+      const r = await fetch(`/api/movie?t=${encodeURIComponent(title)}&y=${year}`);
+      info = r.ok ? await r.json() : null;
+    } catch {}
+    const issues = [];
+    if (!info) issues.push("not found");
+    else {
+      if (!info.poster) issues.push("no poster");
+      if (!info.plot) issues.push("no description");
+      const y = parseInt(info.year, 10);
+      if (Math.abs(y - parseInt(year, 10)) > 1) issues.push(`year is ${info.year}`);
+      if (norm(info.title) !== norm(title) && !norm(info.title).includes(norm(title)) && !norm(title).includes(norm(info.title)))
+        issues.push(`matched "${info.title}"`);
+    }
+    results[i] = { m, info, issues };
+    const tr = document.getElementById("r" + i);
+    tr.className = issues.length ? "problem" : "";
+    tr.children[1].innerHTML = info && info.poster ? `<img alt="" src="${info.poster}">` : `<span class="no">none</span>`;
+    tr.children[3].className = "";
+    tr.children[3].textContent = info ? `${info.title} (${info.year})` : "—";
+    tr.children[4].innerHTML = info && info.plot ? `<span class="ok">yes</span>` : `<span class="no">missing</span>`;
+    tr.children[5].textContent = info && info.rating ? info.rating : "—";
+    tr.children[6].innerHTML = issues.length ? `<span class="no"></span>` : `<span class="ok">OK</span>`;
+    if (issues.length) tr.children[6].firstChild.textContent = issues.join(", ");
+    applyFilter(tr);
+    summarize();
+  }
+
+  function summarize() {
+    const done = results.filter(Boolean);
+    const bad = done.filter(r => r.issues.length);
+    document.getElementById("summary").innerHTML =
+      `<span class="pill">${done.length} of ${titles.length} checked</span>` +
+      `<span class="pill good">${done.length - bad.length} OK</span>` +
+      `<span class="pill ${bad.length ? "bad" : "good"}">${bad.length} with problems</span>`;
+    if (done.length === titles.length) {
+      document.getElementById("out").value = bad.length
+        ? bad.map(r => `${r.m}: ${r.issues.join(", ")}${r.info ? ` [${r.info.imdbID}]` : ""}`).join("\n")
+        : "Every movie has a poster and a description.";
+    }
+  }
+
+  function applyFilter(tr) { tr.hidden = onlyProblems && tr.className !== "problem"; }
+  function toggleAll() {
+    onlyProblems = !onlyProblems;
+    document.getElementById("toggle").textContent = onlyProblems ? "Show all movies" : "Show only problems";
+    rows.querySelectorAll("tr").forEach(applyFilter);
+  }
+  function copyProblems() {
+    const t = document.getElementById("out");
+    t.select();
+    navigator.clipboard && navigator.clipboard.writeText(t.value).catch(() => {});
+  }
+
+  // Check a few at a time so OMDb isn't flooded
+  (async () => {
+    let next = 0;
+    const worker = async () => { while (next < titles.length) await check(next++); };
+    await Promise.all(Array.from({ length: 5 }, worker));
+  })();
+</script>
+</body>
+</html>
