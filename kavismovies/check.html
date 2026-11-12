@@ -38,10 +38,10 @@
     <tbody id="rows"></tbody>
   </table>
 
-<script src="tree.js"></script>
+<script src="movies.js"></script>
 <script>
   const titles = [];
-  (function walk(n) { if (n.ms) n.ms.forEach(m => { if (!titles.includes(m)) titles.push(m); }); else { walk(n.y); walk(n.n); } })(window.MOVIE_TREE);
+  window.MOVIES.forEach(x => titles.push(x.m));
   titles.sort((a, b) => a.localeCompare(b));
 
   const split = m => { const x = m.match(/^(.*) \((\d{4})\)$/); return x ? { title: x[1], year: x[2] } : { title: m, year: "" }; };

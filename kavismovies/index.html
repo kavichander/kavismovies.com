@@ -240,6 +240,24 @@
   .btn-start { background: var(--yellow); color: #111; }
   .btn-start:hover { background: #ffd43b; }
 
+  /* This-or-that round */
+  .card.vs-card { width: min(640px, 100%); text-align: center; }
+  #vs { transform: translateY(-40px); }
+  .vs-title { font-size: 26px; font-weight: 700; letter-spacing: -.015em; margin-bottom: 26px; }
+  .vs-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 22px; margin-bottom: 6px; }
+  .vs-pick {
+    background: none; border: none; cursor: pointer; color: var(--text); font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    transition: transform .2s ease;
+  }
+  .vs-pick .poster { width: 100%; max-width: 210px; }
+  .vs-pick:hover { transform: translateY(-4px); }
+  .vs-pick:hover .poster { box-shadow: 0 0 0 3px var(--blue), 0 18px 40px rgba(0,0,0,.5); }
+  .vs-pick .pick-title { font-size: 16px; margin-top: 14px; }
+  .vs-pick .pick-year { font-size: 14px; }
+  .vs-pick .ph { color: #d8d8d8; font-weight: 800; font-size: 15px; line-height: 1.25; }
+  .vs-word { font-size: 30px; font-weight: 800; color: var(--blue); font-style: italic; }
+
   /* Detail */
   .detail { display: grid; grid-template-columns: 240px 1fr; gap: 32px; text-align: left; align-items: start; }
   .detail .poster { cursor: default; }
@@ -264,6 +282,9 @@
     .card.wide { padding: 28px 20px; }
     .posters { grid-template-columns: repeat(2, 1fr); }
     .detail { grid-template-columns: 1fr; }
+    .vs-row { gap: 10px; }
+    .vs-title { font-size: 21px; }
+    .vs-word { font-size: 22px; }
     .detail .poster { max-width: 220px; }
   }
 </style>
@@ -311,6 +332,18 @@
         <button class="btn btn-no" onclick="answer('n')">No</button>
       </div>
       <button class="back" id="back" onclick="goBack()" disabled>&larr; Previous question</button>
+    </div>
+
+    <div class="card vs-card" id="vs" hidden>
+      <div class="progress-label"><span>Question <b id="vs-num">4</b></span></div>
+      <div class="bar"><div class="bar-fill" id="vs-fill"></div></div>
+      <h1 class="vs-title">Which one are you more in the mood for?</h1>
+      <div class="vs-row">
+        <button class="vs-pick" id="vs-a"><div class="poster"></div><div class="pick-title"></div><div class="pick-year"></div></button>
+        <div class="vs-word">vs.</div>
+        <button class="vs-pick" id="vs-b"><div class="poster"></div><div class="pick-title"></div><div class="pick-year"></div></button>
+      </div>
+      <button class="back" onclick="goBack()">&larr; Previous question</button>
     </div>
 
     <div class="card wide" id="result" hidden>
@@ -390,10 +423,8 @@
       </div>
     </div>
 
-<script src="tree.js"></script>
+<script src="movies.js"></script>
 <script>
-  const root = window.MOVIE_TREE;
-  let path = [], node = root;
   const $ = id => document.getElementById(id);
   const cache = {};
 
@@ -413,10 +444,10 @@
     return cache[m];
   }
 
-  function posterInto(el, m) {
+  function posterInto(el, m, withTitle) {
     const { title } = split(m);
     el.innerHTML = `<div class="ph"></div>`;
-    if (el.id === "d-poster") el.querySelector(".ph").textContent = title;
+    if (withTitle || el.id === "d-poster" || el.id === "r-poster") el.querySelector(".ph").textContent = title;
     getInfo(m).then(info => {
       if (info && info.poster) {
         const img = new Image();
@@ -428,15 +459,135 @@
   }
 
   function show(id) {
-    ["quiz", "result", "detail"].forEach(k => $(k).hidden = k !== id);
+    ["quiz", "vs", "result", "detail"].forEach(k => $(k).hidden = k !== id);
     window.scrollTo(0, 0);
   }
 
+  // ---------- Randomized quiz ----------
+  const MOVIES = window.MOVIES.map(x => ({ m: x.m, t: new Set(x.t) }));
+  const QUESTIONS = window.QUESTIONS;
+  const sim = (a, b) => { let n = 0; a.t.forEach(x => { if (b.t.has(x)) n++; }); return n / (a.t.size + b.t.size - n); };
+  const VS_AT = 3;          // the this-or-that round comes after this many questions
+  let history = [];         // previous states, for the back button
+  let state = null;
+
+  function freshState() {
+    return { cands: MOVIES.slice(), asked: new Set(), answers: [], picks: [], step: 0, vsDone: false, current: null };
+  }
+
+  function tierCap(depth) { return depth < 2 ? 1 : depth < 5 ? 2 : depth < 7 ? 3 : 4; }
+
+  // Pick a question that splits the remaining movies well, with some randomness
+  function chooseQuestion(st) {
+    const n = st.cands.length;
+    let cap = tierCap(st.answers.length), options = [];
+    while (!options.length && cap <= 4) {
+      for (const tag in QUESTIONS) {
+        if (QUESTIONS[tag][0] > cap || st.asked.has(tag)) continue;
+        let y = 0; st.cands.forEach(c => { if (c.t.has(tag)) y++; });
+        if (!y || y === n) continue;
+        options.push({ tag, bal: Math.min(y, n - y) / n });
+      }
+      cap++;
+    }
+    if (!options.length) return null;
+    const best = Math.max(...options.map(o => o.bal));
+    // early questions get more variety; later ones focus on splitting well
+    const good = options.filter(o => o.bal >= best * (st.answers.length < 2 ? 0.3 : 0.5));
+    return good[Math.floor(Math.random() * good.length)].tag;
+  }
+
+  // Pick two quite different movies that split the remaining ones evenly
+  function choosePair(st) {
+    const c = st.cands, n = c.length;
+    const tries = [];
+    for (let k = 0; k < 400; k++) {
+      const a = c[Math.floor(Math.random() * n)], b = c[Math.floor(Math.random() * n)];
+      if (a === b) continue;
+      let sa = 0, sb = 0;
+      c.forEach(x => { const d = sim(x, a) - sim(x, b); if (d > 0) sa++; else if (d < 0) sb++; else { sa++; sb++; } });
+      if (sa === n || sb === n) continue;
+      tries.push({ a, b, score: Math.min(sa, sb) / n + (1 - sim(a, b)) * 0.4 });
+    }
+    if (!tries.length) return null;
+    tries.sort((x, y) => y.score - x.score);
+    return tries[Math.floor(Math.random() * Math.min(5, tries.length))];
+  }
+
+  function estimateLeft(st) {
+    return Math.max(1, Math.ceil(Math.log2(Math.max(st.cands.length, 5) / 5))) + (st.vsDone ? 0 : 1);
+  }
+
+  // Fill the results up to 5 with the movies that best match the answers
+  function topFive(st) {
+    const picked = st.cands.slice(0, 5);
+    if (picked.length >= 5) return picked.map(c => c.m);
+    const score = mv => {
+      let s = 0;
+      st.answers.forEach(a => { if (mv.t.has(a.tag) === a.yes) s += 1; });
+      st.picks.forEach(p => { s += 2 * (sim(mv, p.win) - sim(mv, p.lose)); });
+      return s;
+    };
+    const rest = MOVIES.filter(mv => !picked.includes(mv)).sort((a, b) => score(b) - score(a));
+    return picked.concat(rest.slice(0, 5 - picked.length)).map(c => c.m);
+  }
+
+  function next() {
+    const st = state;
+    // The this-or-that round always happens once, around the middle
+    if (!st.vsDone && st.cands.length >= 4 && (st.answers.length >= VS_AT || st.cands.length <= 12)) {
+      const pair = choosePair(st);
+      if (pair) { st.current = { kind: "vs", a: pair.a, b: pair.b }; return render(); }
+      st.vsDone = true;
+    }
+    if (st.cands.length <= 5) { st.current = { kind: "done" }; return render(); }
+    const tag = chooseQuestion(st);
+    if (!tag) { st.current = { kind: "done" }; return render(); }
+    st.current = { kind: "q", tag };
+    render();
+  }
+
+  function snapshot(st) {
+    return { cands: st.cands.slice(), asked: new Set(st.asked), answers: st.answers.slice(), picks: st.picks.slice(), step: st.step, vsDone: st.vsDone, current: st.current };
+  }
+
+  function answer(a) {
+    const st = state, tag = st.current.tag, yes = a === "y";
+    history.push(snapshot(st));
+    st.asked.add(tag);
+    st.answers.push({ tag, yes });
+    st.cands = st.cands.filter(c => c.t.has(tag) === yes);
+    st.step++;
+    next();
+  }
+
+  function choose(side) {
+    const st = state, win = side === "a" ? st.current.a : st.current.b, lose = side === "a" ? st.current.b : st.current.a;
+    history.push(snapshot(st));
+    st.picks.push({ win, lose });
+    st.cands = st.cands.filter(c => c === win || (c !== lose && sim(c, win) >= sim(c, lose)));
+    st.vsDone = true;
+    st.step++;
+    next();
+  }
+  $("vs-a").onclick = () => choose("a");
+  $("vs-b").onclick = () => choose("b");
+
+  function goBack() { if (history.length) { state = history.pop(); render(); } }
+  function restart() { history = []; state = freshState(); next(); }
+
+  function setProgress(numId, fillId) {
+    const done = state.step, pct = Math.round(done / (done + estimateLeft(state)) * 100);
+    $(numId).textContent = done + 1;
+    $(fillId).style.width = Math.max(pct, 3) + "%";
+  }
+
   function render() {
-    if (node.ms) {
+    const cur = state.current;
+    if (cur.kind === "done") {
       const box = $("posters");
       box.innerHTML = "";
-      node.ms.forEach(m => {
+      topFive(state).forEach(m => {
         const { title, year } = split(m);
         const b = document.createElement("button");
         b.className = "pick";
@@ -450,15 +601,23 @@
       show("result");
       return;
     }
+    if (cur.kind === "vs") {
+      show("vs");
+      setProgress("vs-num", "vs-fill");
+      [["vs-a", cur.a], ["vs-b", cur.b]].forEach(([id, mv]) => {
+        const el = $(id), { title, year } = split(mv.m);
+        posterInto(el.querySelector(".poster"), mv.m, true);
+        el.querySelector(".pick-title").textContent = title;
+        el.querySelector(".pick-year").textContent = year;
+      });
+      return;
+    }
     show("quiz");
     const q = $("q");
     q.style.opacity = 0;
-    setTimeout(() => { q.textContent = node.q; q.style.opacity = 1; }, 150);
-    const done = path.length;
-    const pct = Math.round(done / (done + node.r) * 100);
-    $("num").textContent = done + 1;
-    $("fill").style.width = Math.max(pct, 3) + "%";
-    $("back").disabled = done === 0;
+    setTimeout(() => { q.textContent = QUESTIONS[cur.tag][1]; q.style.opacity = 1; }, 150);
+    setProgress("num", "fill");
+    $("back").disabled = history.length === 0;
   }
 
   function openDetail(m) {
@@ -492,14 +651,10 @@
   }
 
   function closeDetail() { show("result"); }
-  function answer(a) { path.push(node); node = node[a]; render(); }
-  function goBack() { if (path.length) { node = path.pop(); render(); } }
-  function restart() { path = []; node = root; render(); }
   let wheelTitles = [];
   // Fill the big wheel with every movie title, in alternating colors
   (function buildWheel() {
-    const titles = [];
-    (function walk(n) { if (n.ms) n.ms.forEach(m => { if (!titles.includes(m)) titles.push(m); }); else { walk(n.y); walk(n.n); } })(root);
+    const titles = window.MOVIES.map(x => x.m);
     titles.sort((a, b) => a.localeCompare(b));
     wheelTitles = titles;
     const colors = ["#a3222b", "#2656b0", "#1a7d44", "#b8840f"];
@@ -644,7 +799,7 @@
   }
   window.addEventListener("hashchange", route);
   route();
-  render();
+  restart();
 </script>
 </body>
 </html>
