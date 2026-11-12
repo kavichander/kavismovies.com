@@ -96,7 +96,15 @@ export default async (req) => {
       actors: clean(data.Actors),
       director: clean(data.Director),
     },
-    { headers: { "Cache-Control": "public, max-age=86400" } }
+    {
+      headers: {
+        // Browsers keep it for a day; Netlify's CDN shares it with every visitor
+        // for a week, so OMDb only gets asked about each movie once in a while.
+        "Cache-Control": "public, max-age=86400",
+        "Netlify-CDN-Cache-Control": "public, s-maxage=604800, durable",
+        "Netlify-Vary": "query",
+      },
+    }
   );
 };
 
