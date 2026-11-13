@@ -91,17 +91,35 @@
   body.on-fav .backdrop, body.on-fav main, body.on-fav .top-left, body.on-fav #fav-btn { display: none; }
   body.on-all header, body.on-fav header { background: linear-gradient(#0b0b0b 75%, rgba(11,11,11,0)); padding-bottom: 34px; }
 
-  /* Favorites page */
-  .fav-section { max-width: 1200px; margin: 0 auto 44px; }
-  .fav-section h2 {
-    font-size: 22px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 12px;
+  /* Favorites showcase */
+  .fav-page {
+    position: fixed; inset: 0; z-index: 2; overflow: hidden;
+    background: radial-gradient(ellipse at center 55%, #1a1a1a 0%, #0a0a0a 70%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 110px 20px 90px;
   }
-  .fav-section h2::after { content: ""; flex: 1; height: 1px; background: rgba(58,134,255,.25); }
-  .fav-empty {
-    color: var(--muted); font-size: 15px; padding: 26px; text-align: center;
-    border: 1px dashed #333; border-radius: 14px;
+  .fav-stage { position: relative; width: 100%; max-width: 1300px; height: min(56vh, 470px); perspective: 1400px; }
+  .fav-ring { position: absolute; inset: 0; transform-style: preserve-3d; }
+  .fav-item {
+    position: absolute; top: 50%; left: 50%; height: 100%; aspect-ratio: 2 / 3;
+    background: none; border: none; padding: 0; cursor: pointer;
+    transition: transform .7s cubic-bezier(.25,.8,.25,1), opacity .7s ease, filter .7s ease;
+    will-change: transform;
   }
+  .fav-item .poster { width: 100%; height: 100%; box-shadow: 0 30px 70px rgba(0,0,0,.65); }
+  .fav-item .ph { color: #d8d8d8; font-weight: 800; font-size: 16px; line-height: 1.25; }
+  .fav-item.center .poster { box-shadow: 0 0 0 3px var(--blue), 0 30px 80px rgba(0,0,0,.75); }
+  .fav-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 50;
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(58,134,255,.35);
+    background: rgba(0,0,0,.8); color: var(--blue); font-size: 30px; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding-bottom: 4px;
+  }
+  .fav-arrow:hover { border-color: var(--blue); }
+  .fav-arrow.left { left: 8px; } .fav-arrow.right { right: 8px; }
+  .fav-caption { text-align: center; margin-top: 26px; min-height: 52px; }
+  .fav-title { font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
+  .fav-year { color: var(--muted); font-size: 15px; margin-top: 4px; }
 
   /* Random page */
   .random-page {
@@ -289,6 +307,9 @@
     header { padding: 18px 20px; }
     .top-left { left: 12px; top: 10px; gap: 10px; }
     .top-right { top: 14px; right: 12px; gap: 8px; }
+    .fav-stage { height: 42vh; }
+    .fav-arrow { width: 40px; height: 40px; font-size: 26px; }
+    .fav-title { font-size: 20px; }
     .all-btn { font-size: 13px; padding: 7px 12px 7px 9px; }
     .all-page { padding: 150px 16px 100px; }
     .all-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 16px 12px; }
@@ -416,9 +437,13 @@
   </section>
 
 
-  <section class="all-page" id="fav-page" hidden>
-    <div class="all-head"><h1>kavis favorites</h1></div>
-    <div id="fav-sections"></div>
+  <section class="fav-page" id="fav-page" hidden>
+    <div class="fav-stage" id="fav-stage">
+      <button class="fav-arrow left" id="fav-prev" aria-label="Previous movie">&#8249;</button>
+      <div class="fav-ring" id="fav-ring"></div>
+      <button class="fav-arrow right" id="fav-next" aria-label="Next movie">&#8250;</button>
+    </div>
+    <div class="fav-caption"><div class="fav-title" id="fav-title"></div><div class="fav-year" id="fav-year"></div></div>
     <button class="back-home" onclick="location.hash=''">&larr; Back to the questions</button>
   </section>
 
@@ -817,42 +842,68 @@
     $("all-empty").hidden = shown > 0;
   });
 
-  // Kavi's favorites page
-  let favBuilt = false;
+  // Kavi's favorites: a rotating showcase
+  const favs = window.FAVORITES || [];
+  let favIndex = 0, favTimer = null, favBuilt = false, favPaused = false;
   function buildFavorites() {
     if (favBuilt) return;
     favBuilt = true;
-    const wrap = $("fav-sections");
-    Object.entries(window.FAVORITES || {}).forEach(([cat, list]) => {
-      const sec = document.createElement("section");
-      sec.className = "fav-section";
-      sec.innerHTML = `<h2></h2>`;
-      sec.querySelector("h2").textContent = cat;
-      if (!list.length) {
-        const p = document.createElement("p");
-        p.className = "fav-empty";
-        p.textContent = "Picks coming soon.";
-        sec.appendChild(p);
-      } else {
-        const grid = document.createElement("div");
-        grid.className = "all-grid";
-        list.forEach(m => {
-          const { title, year } = split(m);
-          const b = document.createElement("button");
-          b.className = "pick";
-          b.innerHTML = `<div class="poster"><div class="ph"></div></div><div class="pick-title"></div><div class="pick-year"></div>`;
-          b.querySelector(".pick-title").textContent = title;
-          b.querySelector(".pick-year").textContent = year;
-          b.querySelector(".poster").dataset.m = m;
-          b.onclick = () => showSpinResult(m, false);
-          grid.appendChild(b);
-          lazy.observe(b.querySelector(".poster"));
-        });
-        sec.appendChild(grid);
-      }
-      wrap.appendChild(sec);
+    const ring = $("fav-ring");
+    favs.forEach((m, i) => {
+      const b = document.createElement("button");
+      b.className = "fav-item";
+      b.setAttribute("aria-label", split(m).title);
+      b.innerHTML = `<div class="poster"></div>`;
+      posterInto(b.querySelector(".poster"), m, true);
+      b.onclick = () => { if (i === favIndex) showSpinResult(m, false); else { favIndex = i; layoutFavs(); restartFavTimer(); } };
+      ring.appendChild(b);
     });
+    const stage = $("fav-stage");
+    stage.addEventListener("mouseenter", () => { favPaused = true; });
+    stage.addEventListener("mouseleave", () => { favPaused = false; });
+    $("fav-prev").onclick = () => { stepFav(-1); restartFavTimer(); };
+    $("fav-next").onclick = () => { stepFav(1); restartFavTimer(); };
+    let touchX = null;
+    stage.addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener("touchend", e => {
+      if (touchX === null) return;
+      const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+      if (Math.abs(dx) > 40) { stepFav(dx < 0 ? 1 : -1); restartFavTimer(); }
+    });
+    layoutFavs();
   }
+  function layoutFavs() {
+    const n = favs.length, items = $("fav-ring").children;
+    const w = items[0] ? items[0].offsetWidth : 300;
+    for (let i = 0; i < n; i++) {
+      let d = i - favIndex;
+      if (d > n / 2) d -= n;
+      if (d < -n / 2) d += n;
+      const ad = Math.abs(d), el = items[i];
+      const x = Math.sign(d) * (ad === 0 ? 0 : w * 0.62 + (ad - 1) * w * 0.42);
+      el.style.transform = `translate(-50%, -50%) translateX(${x}px) translateZ(${-ad * 140}px) rotateY(${-Math.sign(d) * Math.min(ad, 1) * 35}deg)`;
+      el.style.zIndex = 40 - ad;
+      el.style.opacity = ad > 3 ? 0 : 1;
+      el.style.filter = ad === 0 ? "none" : `brightness(${1 - Math.min(ad, 3) * 0.2})`;
+      el.style.pointerEvents = ad > 3 ? "none" : "auto";
+      el.classList.toggle("center", ad === 0);
+    }
+    const { title, year } = split(favs[favIndex] || "");
+    $("fav-title").textContent = title;
+    $("fav-year").textContent = year;
+  }
+  function stepFav(dir) { favIndex = (favIndex + dir + favs.length) % favs.length; layoutFavs(); }
+  function restartFavTimer() {
+    clearInterval(favTimer);
+    favTimer = setInterval(() => { if (!favPaused && $("spin-result").hidden) stepFav(1); }, 3200);
+  }
+  function stopFavTimer() { clearInterval(favTimer); favTimer = null; }
+  document.addEventListener("keydown", e => {
+    if ($("fav-page").hidden || !$("spin-result").hidden) return;
+    if (e.key === "ArrowRight") { stepFav(1); restartFavTimer(); }
+    if (e.key === "ArrowLeft") { stepFav(-1); restartFavTimer(); }
+  });
+  window.addEventListener("resize", () => { if (!$("fav-page").hidden) layoutFavs(); });
 
   function route() {
     const onRandom = location.hash === "#random";
@@ -865,7 +916,7 @@
     $("all-page").hidden = !onAll;
     $("fav-page").hidden = !onFav;
     if (onAll) buildAll();
-    if (onFav) buildFavorites();
+    if (onFav) { buildFavorites(); layoutFavs(); restartFavTimer(); } else stopFavTimer();
     closeSpin();
   }
   window.addEventListener("hashchange", route);

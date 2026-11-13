@@ -1,9 +1,32 @@
-// Kavi's favorite movies, by category.
-// Add movies as "Title (Year)", matching how they're listed on the site.
-window.FAVORITES = {
-  "Drama": [],
-  "Action": [],
-  "Crime": [],
-  "Animation": [],
-  "Horror": []
-};
+// Kavi's favorite movies of all time, shown in the rotating showcase.
+// Add or remove movies as "Title (Year)".
+window.FAVORITES = [
+  "Warrior (2011)",
+  "Top Gun (1986)",
+  "Tombstone (1993)",
+  "The Usual Suspects (1995)",
+  "The Thomas Crown Affair (1999)",
+  "The Lego Batman Movie (2017)",
+  "The Hateful Eight (2015)",
+  "The Devil's Advocate (1997)",
+  "The Martian (2015)",
+  "Se7en (1995)",
+  "Seven Years in Tibet (1997)",
+  "Schindler's List (1993)",
+  "Rocky (1976)",
+  "Ocean's Eleven (2001)",
+  "Kingdom of Heaven (2005)",
+  "Inglourious Basterds (2009)",
+  "Gladiator (2000)",
+  "Get Out (2017)",
+  "Fight Club (1999)",
+  "Dune (2021)",
+  "Casino Royale (2006)",
+  "Boogie Nights (1997)",
+  "Blood Diamond (2006)",
+  "Before Sunrise (1995)",
+  "Avatar (2009)",
+  "Kill Bill: Vol. 1 (2003)",
+  "The Prestige (2006)",
+  "Interstellar (2014)"
+];
