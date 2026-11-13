@@ -478,6 +478,7 @@
     </div>
 
 <script src="movies.js"></script>
+<script src="movie-data.js"></script>
 <script src="favorites.js"></script>
 <script>
   const $ = id => document.getElementById(id);
@@ -490,6 +491,8 @@
 
   // Movie info (poster, rating, plot) comes from /api/movie on the live site.
   function getInfo(m) {
+    const saved = window.MOVIE_DATA && window.MOVIE_DATA[m];
+    if (saved) return Promise.resolve(saved);
     if (!cache[m]) {
       const { title, year } = split(m);
       cache[m] = fetch(`/api/movie?t=${encodeURIComponent(title)}&y=${year}`)

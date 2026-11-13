@@ -26,7 +26,7 @@
 </head>
 <body>
   <h1>Movie check</h1>
-  <p class="note">Looks up every movie on the site and flags any that are missing a poster or description, can't be found, or might have matched the wrong movie. Each run uses one OMDb lookup per movie, so run it once and copy the results.</p>
+  <p class="note">Looks up every movie on the site and flags any that are missing a poster or description, can't be found, or might have matched the wrong movie. Movies already saved on the site don't use any OMDb lookups.</p>
   <div class="summary" id="summary"><span class="pill">Starting…</span></div>
   <div>
     <button onclick="copyProblems()">Copy the problem list</button>
@@ -39,9 +39,12 @@
   </table>
 
 <script src="movies.js"></script>
+<script src="movie-data.js"></script>
+<script src="favorites.js"></script>
 <script>
   const titles = [];
   window.MOVIES.forEach(x => titles.push(x.m));
+  (window.FAVORITES || []).forEach(m => { if (!titles.includes(m)) titles.push(m); });
   titles.sort((a, b) => a.localeCompare(b));
 
   const split = m => { const x = m.match(/^(.*) \((\d{4})\)$/); return x ? { title: x[1], year: x[2] } : { title: m, year: "" }; };
@@ -60,8 +63,8 @@
 
   async function check(i) {
     const m = titles[i], { title, year } = split(m);
-    let info = null;
-    try {
+    let info = (window.MOVIE_DATA || {})[m] || null;
+    if (!info) try {
       const r = await fetch(`/api/movie?t=${encodeURIComponent(title)}&y=${year}`);
       info = r.ok ? await r.json() : null;
     } catch {}
