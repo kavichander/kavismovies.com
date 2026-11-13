@@ -35,8 +35,8 @@ export default async (req) => {
     try {
       const r = await fetch(`https://www.omdbapi.com/?apikey=${key}&type=movie&${params}`);
       return await r.json();
-    } catch {
-      return { Response: "False" };
+    } catch (e) {
+      return { Response: "False", Error: "Could not reach OMDb: " + e.message };
     }
   };
   const ok = (d) => d && d.Response === "True";
@@ -71,7 +71,9 @@ export default async (req) => {
   }
 
   if (!data) {
-    return Response.json({ error: "not found" }, { status: 404 });
+    // Pass along OMDb's own message (for example a key or limit problem)
+    const probe = await omdb(`t=${encodeURIComponent(official)}`);
+    return Response.json({ error: "not found", omdb: probe.Error || null }, { status: 404 });
   }
 
   const clean = (v) => (v && v !== "N/A" ? v : null);
