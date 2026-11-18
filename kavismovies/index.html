@@ -32,14 +32,26 @@
     overflow-x: hidden;
   }
 
-  /* Background photo */
+  /* Background: dark, corporate */
   .backdrop {
-    position: fixed; inset: 0; z-index: 0;
-    background: #000 url("bg.jpg") center 70% / cover no-repeat;
+    position: fixed; inset: 0; z-index: 0; overflow: hidden;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 38%, rgba(58,134,255,.16), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 85% 100%, rgba(58,134,255,.08), transparent 70%),
+      linear-gradient(160deg, #0d1117 0%, #0b0f16 45%, #07090d 100%);
+  }
+  .backdrop::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 42%, #000 30%, transparent 85%);
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 42%, #000 30%, transparent 85%);
   }
   .backdrop::after {
-    content: ""; position: absolute; inset: 0;
-    background: radial-gradient(ellipse at center 45%, rgba(0,0,0,.15), rgba(0,0,0,.55) 75%);
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(58,134,255,.45), transparent);
   }
 
   .top-left {
