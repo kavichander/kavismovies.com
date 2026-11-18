@@ -133,6 +133,38 @@
   .fav-title { font-size: 24px; font-weight: 800; letter-spacing: -.01em; }
   .fav-year { color: var(--muted); font-size: 15px; margin-top: 4px; }
 
+  /* Reviews */
+  .reviews { border-top: 1px solid #333; margin-top: 28px; padding-top: 24px; text-align: left; }
+  .reviews-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+  .reviews-head h2 { font-size: 20px; font-weight: 800; }
+  .rev-avg { color: var(--muted); font-size: 14px; }
+  .rev-avg b { color: #f5c518; }
+  .rev-form { display: grid; gap: 12px; margin-bottom: 22px; }
+  .rev-input {
+    font-family: inherit; font-size: 15px; color: var(--text); background: #111;
+    border: 1px solid #3a3a3a; border-radius: 10px; padding: 11px 14px; width: 100%; resize: vertical;
+  }
+  .rev-input:focus { outline: none; border-color: var(--blue); }
+  #rev-name { max-width: 320px; }
+  .star-input { display: flex; gap: 4px; }
+  .star { background: none; border: none; padding: 2px; cursor: pointer; line-height: 0; }
+  .star svg { width: 30px; height: 30px; fill: none; stroke: #f5c518; stroke-width: 1.6; stroke-linejoin: round; transition: transform .1s ease; }
+  .star.on svg { fill: #f5c518; }
+  .star:hover svg { transform: scale(1.12); }
+  .rev-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  .rev-submit { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .rev-submit .btn { padding: 12px 22px; }
+  .rev-msg { font-size: 14px; color: var(--muted); }
+  .rev-msg.err { color: #ff8a80; }
+  .rev-msg.ok { color: #7ee2b0; }
+  .rev-item { padding: 14px 0; border-top: 1px solid #2a2a2a; }
+  .rev-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .rev-name { font-weight: 800; }
+  .rev-shown { color: #f5c518; letter-spacing: 2px; font-size: 15px; }
+  .rev-date { color: var(--muted); font-size: 13px; }
+  .rev-text { color: #dcdcdc; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .rev-empty { color: var(--muted); font-size: 15px; }
+
   /* Random page */
   .random-page {
     position: fixed; inset: 0; z-index: 2;
@@ -486,6 +518,18 @@
             </div>
           </div>
         </div>
+
+        <section class="reviews" id="reviews" hidden>
+          <div class="reviews-head"><h2>Reviews</h2><span class="rev-avg" id="rev-avg"></span></div>
+          <form class="rev-form" id="rev-form" novalidate>
+            <input class="rev-input" id="rev-name" type="text" maxlength="40" placeholder="Your name" autocomplete="name">
+            <div class="star-input" id="rev-stars" role="group" aria-label="Your rating"><button type="button" class="star" data-v="1" aria-label="1 star"><svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg></button><button type="button" class="star" data-v="2" aria-label="2 stars"><svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg></button><button type="button" class="star" data-v="3" aria-label="3 stars"><svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg></button><button type="button" class="star" data-v="4" aria-label="4 stars"><svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg></button><button type="button" class="star" data-v="5" aria-label="5 stars"><svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg></button></div>
+            <textarea class="rev-input" id="rev-text" maxlength="800" rows="3" placeholder="What did you think of it?"></textarea>
+            <input class="rev-hp" id="rev-website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <div class="rev-submit"><button class="btn btn-start" type="submit" id="rev-post">Post review</button><span class="rev-msg" id="rev-msg"></span></div>
+          </form>
+          <div class="rev-list" id="rev-list"></div>
+        </section>
       </div>
     </div>
 
@@ -792,6 +836,7 @@
     $("r-label").textContent = fromWheel ? "The wheel picked" : "";
     $("r-label").hidden = !fromWheel;
     $("r-again").hidden = !fromWheel;
+    if (fromWheel) { $("reviews").hidden = true; revMovie = null; } else openReviews(m);
     $("r-title").textContent = title;
     $("r-year").textContent = year;
     $("r-rating").innerHTML = "";
@@ -817,6 +862,86 @@
     });
   }
   function closeSpin() { $("spin-result").hidden = true; }
+
+  // ---------- Reviews (view all movies + kavis favorites) ----------
+  let revMovie = null, revStars = 0;
+  const starBtns = [...document.querySelectorAll("#rev-stars .star")];
+  function paintStars(n) { starBtns.forEach(b => b.classList.toggle("on", +b.dataset.v <= n)); }
+  starBtns.forEach(b => {
+    b.addEventListener("click", () => { revStars = +b.dataset.v; paintStars(revStars); });
+    b.addEventListener("mouseenter", () => paintStars(+b.dataset.v));
+    b.addEventListener("mouseleave", () => paintStars(revStars));
+  });
+  const starText = n => "\u2605".repeat(n) + "\u2606".repeat(5 - n);
+  function revMsg(text, kind) { const el = $("rev-msg"); el.textContent = text; el.className = "rev-msg" + (kind ? " " + kind : ""); }
+
+  function renderReviews(list) {
+    const box = $("rev-list");
+    box.innerHTML = "";
+    if (!list.length) {
+      $("rev-avg").textContent = "";
+      box.innerHTML = `<p class="rev-empty">No reviews yet. Be the first!</p>`;
+      return;
+    }
+    const avg = list.reduce((a, r) => a + r.stars, 0) / list.length;
+    $("rev-avg").innerHTML = `<b></b> <span></span>`;
+    $("rev-avg").firstChild.textContent = `\u2605 ${avg.toFixed(1)}`;
+    $("rev-avg").lastChild.textContent = `from ${list.length} review${list.length === 1 ? "" : "s"}`;
+    list.forEach(r => {
+      const item = document.createElement("div");
+      item.className = "rev-item";
+      item.innerHTML = `<div class="rev-top"><span class="rev-name"></span><span class="rev-shown"></span><span class="rev-date"></span></div><p class="rev-text"></p>`;
+      item.querySelector(".rev-name").textContent = r.name;
+      item.querySelector(".rev-shown").textContent = starText(r.stars);
+      item.querySelector(".rev-shown").setAttribute("aria-label", `${r.stars} out of 5 stars`);
+      item.querySelector(".rev-date").textContent = new Date(r.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      item.querySelector(".rev-text").textContent = r.text;
+      box.appendChild(item);
+    });
+  }
+
+  async function openReviews(m) {
+    revMovie = m; revStars = 0; paintStars(0);
+    $("rev-text").value = ""; $("rev-website").value = ""; revMsg("");
+    try { $("rev-name").value = localStorage.getItem("km-name") || ""; } catch {}
+    $("reviews").hidden = false;
+    $("rev-list").innerHTML = `<p class="rev-empty">Loading reviews...</p>`;
+    $("rev-avg").textContent = "";
+    try {
+      const r = await fetch(`/api/reviews?m=${encodeURIComponent(m)}`);
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      if (revMovie === m) renderReviews(d.reviews || []);
+    } catch {
+      if (revMovie === m) $("rev-list").innerHTML = `<p class="rev-empty">Reviews couldn't load right now. Try again in a moment.</p>`;
+    }
+  }
+
+  $("rev-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = $("rev-name").value.trim(), text = $("rev-text").value.trim();
+    if (!name) return revMsg("Add your name first.", "err");
+    if (!revStars) return revMsg("Tap the stars to rate it.", "err");
+    if (!text) return revMsg("Write a quick review.", "err");
+    const m = revMovie;
+    $("rev-post").disabled = true; revMsg("Posting...");
+    try {
+      const r = await fetch("/api/reviews", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ movie: m, name, stars: revStars, text, website: $("rev-website").value })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "");
+      try { localStorage.setItem("km-name", name); } catch {}
+      $("rev-text").value = ""; revStars = 0; paintStars(0);
+      revMsg("Thanks! Your review is up.", "ok");
+      if (revMovie === m) openReviews(m).then(() => revMsg("Thanks! Your review is up.", "ok"));
+    } catch (err) {
+      revMsg(err.message || "Couldn't post that right now. Try again in a moment.", "err");
+    } finally {
+      $("rev-post").disabled = false;
+    }
+  });
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeSpin(); });
 
   // All movies page: poster grid that loads posters as you scroll
